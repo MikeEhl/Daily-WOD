@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Daily WOD</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Daily WOD">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231c1c1a'/%3E%3Ctext x='50' y='66' font-family='Arial,Helvetica,sans-serif' font-size='46' font-weight='800' text-anchor='middle' fill='%23ff7a45'%3EDW%3C/text%3E%3C/svg%3E">
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--text:#1c1c1a;--muted:#6b6b66;--accent:#d94f1e;--line:#e3e1db;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141413;--card:#1f1f1d;--text:#f1f0ec;--muted:#9a9a93;--accent:#ff7a45;--line:#333330;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141413;--card:#1f1f1d;--text:#f1f0ec;--muted:#9a9a93;--accent:#ff7a45;--line:#333330;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.4}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+.date{color:var(--muted);font-size:14px;margin:0}
+h1{font-size:28px;margin:4px 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+.fmt{display:inline-block;background:var(--accent);color:#fff;font-weight:700;font-size:12px;letter-spacing:.08em;padding:4px 10px;border-radius:99px}
+.title{font-size:22px;font-weight:700;margin:10px 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 0 12px}
+ul.mv{list-style:none;margin:0;padding:0}
+ul.mv li{padding:10px 0;border-top:1px solid var(--line);font-size:18px;display:flex;justify-content:space-between;gap:12px}
+a.vid{color:var(--muted);text-decoration:none;font-size:12px;margin-left:6px;opacity:.7}
+a.vid:hover{color:var(--accent);opacity:1}
+ul.mv li span:last-child{color:var(--muted);font-size:14px;align-self:center;text-align:right}
+.time{font-size:56px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;margin:4px 0 4px}
+.cur{text-align:center;color:var(--muted);min-height:22px;margin-bottom:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--text);padding:12px 16px;border-radius:10px;cursor:pointer;flex:1;min-width:90px}
+button.p{background:var(--accent);border-color:var(--accent);color:#fff}
+h2{font-size:16px;margin:0 0 8px}
+.log div{padding:8px 0;border-top:1px solid var(--line);font-size:14px;display:flex;justify-content:space-between;gap:10px}
+.log small{color:var(--muted)}
+.empty{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <p class="date" id="date"></p>
+  <h1>Today's WOD</h1>
+  <div class="card" id="wod"></div>
+  <div class="card">
+    <div class="time" id="clock">00:00</div>
+    <div class="cur" id="cur"></div>
+    <div class="row">
+      <button class="p" id="go">Start</button>
+      <button id="rst">Reset</button>
+    </div>
+  </div>
+  <div class="row" style="margin-bottom:14px">
+    <button id="reroll">Reroll</button>
+    <button class="p" id="done">Mark done</button>
+  </div>
+  <div class="card log"><h2>Log</h2><div id="log"></div></div>
+</main>
+<script>
+// Home screen icon (DW)
+(function(){try{var c=document.createElement("canvas");c.width=c.height=180;var x=c.getContext("2d");x.fillStyle="#1c1c1a";x.fillRect(0,0,180,180);x.fillStyle="#ff7a45";x.font="800 84px Arial,Helvetica,sans-serif";x.textAlign="center";x.textBaseline="middle";x.fillText("DW",90,94);var l=document.createElement("link");l.rel="apple-touch-icon";l.href=c.toDataURL("image/png");document.head.appendChild(l)}catch(e){}})();
+
+// Movement library: t = type, b = base reps (or cal), u = unit
+var LIFT=[
+ {n:"Barbell Thruster",b:10},{n:"Barbell Deadlift",b:10},{n:"Barbell Power Clean",b:8},
+ {n:"Barbell Front Squat",b:10},{n:"Barbell Push Press",b:10},{n:"Barbell Hang Clean",b:8},
+ {n:"DB Thruster",b:10},{n:"DB Snatch (alternating)",b:10},{n:"DB Devil Press",b:6},
+ {n:"DB Walking Lunge",b:16},{n:"KB Swing",b:15},{n:"KB Goblet Squat",b:12},
+ {n:"KB Clean & Press (each)",b:6},{n:"KB Snatch (each)",b:8}
+];
+var BODY=[
+ {n:"Burpee",b:10},{n:"Air Squat",b:20},{n:"Push-up",b:15},{n:"Sit-up",b:20},
+ {n:"V-up",b:12},{n:"Mountain Climber (each leg)",b:15},{n:"Jump Lunge",b:16}
+];
+var ROW={n:"Row",b:12,u:"cal"};
+
+function seedFrom(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function pick(r,arr,n){var c=arr.slice(),o=[];while(o.length<n&&c.length){o.push(c.splice(Math.floor(r()*c.length),1)[0])}return o}
+function r5(x){return Math.max(5,Math.round(x/5)*5)}
+
+function build(seed){
+  var r=rng(seed), f=["AMRAP","FOR TIME","EMOM","CHIPPER"][Math.floor(r()*4)], w;
+  var L=pick(r,LIFT,2), B=pick(r,BODY,2);
+  if(f==="AMRAP"){
+    var m=[12,15,18,20][Math.floor(r()*4)];
+    w={f:f,cap:m*60,title:m+"-minute AMRAP",sub:"As many rounds as possible. Moderate weight you can move unbroken.",
+       mv:[L[0],B[0],ROW].map(function(x){return{n:x.n,q:x.b+(x.u?" cal":"")}})};
+  }else if(f==="FOR TIME"){
+    var s=[[21,15,9],[15,12,9],[12,9,6]][Math.floor(r()*3)], a=L[0], b=B[0];
+    w={f:f,cap:0,title:s.join("-")+" For Time",sub:"Do each movement for the round's reps, then move on. Race the clock.",
+       mv:[{n:a.n,q:s.join(" - ")},{n:b.n,q:s.join(" - ")},{n:"Row",q:s.map(function(x){return Math.round(x*0.8)}).join(" - ")+" cal"}]};
+  }else if(f==="EMOM"){
+    var m2=[12,16,20][Math.floor(r()*3)], st=[L[0],B[0],ROW,L[1]];
+    w={f:f,cap:m2*60,emom:st.map(function(x){return x.n+" x "+x.b+(x.u?" cal":"")}),
+       title:m2+"-minute EMOM",sub:"Start a new station every minute, rest what's left. Cycles through "+st.length+" stations.",
+       mv:st.map(function(x,i){return{n:"Min "+(i+1)+", "+(i+1+st.length)+", ...",q:x.n+" x "+x.b+(x.u?" cal":"")}})};
+  }else{
+    var c=[L[0],B[0],ROW,L[1],B[1]];
+    w={f:f,cap:0,title:"Chipper",sub:"Work through the list once, top to bottom. Break reps up as needed.",
+       mv:c.map(function(x){return{n:x.n,q:(x.u?r5(x.b*2.5):r5(x.b*(LIFT.indexOf(x)>-1?2.5:3)))+(x.u?" cal":"")}})};
+  }
+  return w;
+}
+
+var d=new Date(), key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+var offset=0, W;
+try{var o=localStorage.getItem("wod-offset-"+key);if(o)offset=parseInt(o,10)||0}catch(e){}
+
+function vid(name){
+  var q=name.replace(/\(.*?\)/g,"").replace(/\bDB\b/g,"dumbbell").replace(/\bKB\b/g,"kettlebell").trim();
+  q=(q==="Row"?"rowing machine technique":q+" how to");
+  return ' <a class="vid" target="_blank" rel="noopener" title="Watch how" href="https://www.youtube.com/results?search_query='+encodeURIComponent(q)+'">\u25B6</a>';
+}
+function render(){
+  W=build(seedFrom(key+"#"+offset));
+  document.getElementById("date").textContent=d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  document.getElementById("wod").innerHTML='<span class="fmt">'+W.f+'</span><div class="title">'+W.title+'</div><p class="sub">'+W.sub+'</p><ul class="mv">'+
+    W.mv.map(function(m){return"<li><span>"+(m.q.indexOf(" x ")>-1&&W.f==="EMOM"?m.q:m.n)+vid(W.f==="EMOM"?m.q.split(" x ")[0]:m.n)+"</span><span>"+(W.f==="EMOM"?m.n:m.q)+"</span></li>"}).join("")+"</ul>";
+  reset();
+}
+
+// Timer
+var t=0,iv=null;
+function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function show(){
+  var shown=W.cap?Math.max(0,W.cap-t):t;
+  document.getElementById("clock").textContent=fmt(shown);
+  var cur="";
+  if(W.f==="EMOM"&&t<W.cap){cur="Min "+(Math.floor(t/60)+1)+": "+W.emom[Math.floor(t/60)%W.emom.length]}
+  if(W.cap&&t>=W.cap){cur="Time!"}
+  document.getElementById("cur").textContent=cur;
+}
+function tick(){t++;show();if(W.cap&&t>=W.cap){stop();beep()}}
+function beep(){try{navigator.vibrate&&navigator.vibrate([300,100,300])}catch(e){}}
+function stop(){clearInterval(iv);iv=null;document.getElementById("go").textContent="Start"}
+function reset(){stop();t=0;show()}
+document.getElementById("go").onclick=function(){
+  if(iv){stop();return}
+  if(W.cap&&t>=W.cap)t=0;
+  iv=setInterval(tick,1000);this.textContent="Pause";
+};
+document.getElementById("rst").onclick=reset;
+
+// Reroll
+document.getElementById("reroll").onclick=function(){
+  offset++;try{localStorage.setItem("wod-offset-"+key,String(offset))}catch(e){}
+  render();
+};
+
+// Log
+function getLog(){try{return JSON.parse(localStorage.getItem("wod-log")||"[]")}catch(e){return[]}}
+function drawLog(){
+  var l=getLog(),el=document.getElementById("log");
+  el.innerHTML=l.length?l.slice().reverse().slice(0,10).map(function(x){
+    return"<div><span>"+x.title+"<br><small>"+x.d+"</small></span><span>"+x.time+"</span></div>"}).join(""):'<div class="empty">Nothing logged yet.</div>';
+}
+document.getElementById("done").onclick=function(){
+  var l=getLog();
+  l.push({d:key,title:W.f+": "+W.title,time:t?fmt(t):"done"});
+  try{localStorage.setItem("wod-log",JSON.stringify(l))}catch(e){}
+  drawLog();this.textContent="Logged \u2713";var b=this;setTimeout(function(){b.textContent="Mark done"},1500);
+};
+
+render();drawLog();
+</script>
+</body>
+</html>
