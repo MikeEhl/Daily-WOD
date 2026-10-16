@@ -33,6 +33,9 @@ ul.mv li span:last-child{color:var(--muted);font-size:14px;align-self:center;tex
 .row{display:flex;gap:8px;flex-wrap:wrap}
 button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--text);padding:12px 16px;border-radius:10px;cursor:pointer;flex:1;min-width:90px}
 button.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.wt{display:block;width:96px;margin-top:6px;font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+.log .wrow{border-top:0;padding:0;margin-top:10px;display:flex;gap:8px;justify-content:flex-start}
+button.s{padding:8px 12px;font-size:14px;min-width:0;flex:none}
 h2{font-size:16px;margin:0 0 8px}
 .log div{padding:8px 0;border-top:1px solid var(--line);font-size:14px;display:flex;justify-content:space-between;gap:10px}
 .log small{color:var(--muted)}
@@ -56,7 +59,7 @@ h2{font-size:16px;margin:0 0 8px}
     <button id="reroll">Reroll</button>
     <button class="p" id="done">Mark done</button>
   </div>
-  <div class="card log"><h2>Log</h2><div id="log"></div></div>
+  <div class="card log"><h2>Log</h2><div id="log"></div><div class="wrow"><button class="s" id="all">Show all</button><button class="s" id="exp">Export CSV</button><button class="s" id="cp">Copy</button></div></div>
 </main>
 <script>
 // Home screen icon (DW)
@@ -87,20 +90,20 @@ function build(seed){
   if(f==="AMRAP"){
     var m=[12,15,18,20][Math.floor(r()*4)];
     w={f:f,cap:m*60,title:m+"-minute AMRAP",sub:"As many rounds as possible. Moderate weight you can move unbroken.",
-       mv:[L[0],B[0],ROW].map(function(x){return{n:x.n,q:x.b+(x.u?" cal":"")}})};
+       mv:[L[0],B[0],ROW].map(function(x){return{n:x.n,w:LIFT.indexOf(x)>-1,q:x.b+(x.u?" cal":"")}})};
   }else if(f==="FOR TIME"){
     var s=[[21,15,9],[15,12,9],[12,9,6]][Math.floor(r()*3)], a=L[0], b=B[0];
     w={f:f,cap:0,title:s.join("-")+" For Time",sub:"Do each movement for the round's reps, then move on. Race the clock.",
-       mv:[{n:a.n,q:s.join(" - ")},{n:b.n,q:s.join(" - ")},{n:"Row",q:s.map(function(x){return Math.round(x*0.8)}).join(" - ")+" cal"}]};
+       mv:[{n:a.n,w:true,q:s.join(" - ")},{n:b.n,q:s.join(" - ")},{n:"Row",q:s.map(function(x){return Math.round(x*0.8)}).join(" - ")+" cal"}]};
   }else if(f==="EMOM"){
     var m2=[12,16,20][Math.floor(r()*3)], st=[L[0],B[0],ROW,L[1]];
     w={f:f,cap:m2*60,emom:st.map(function(x){return x.n+" x "+x.b+(x.u?" cal":"")}),
        title:m2+"-minute EMOM",sub:"Start a new station every minute, rest what's left. Cycles through "+st.length+" stations.",
-       mv:st.map(function(x,i){return{n:"Min "+(i+1)+", "+(i+1+st.length)+", ...",q:x.n+" x "+x.b+(x.u?" cal":"")}})};
+       mv:st.map(function(x,i){return{n:"Min "+(i+1)+", "+(i+1+st.length)+", ...",w:LIFT.indexOf(x)>-1,q:x.n+" x "+x.b+(x.u?" cal":"")}})};
   }else{
     var c=[L[0],B[0],ROW,L[1],B[1]];
     w={f:f,cap:0,title:"Chipper",sub:"Work through the list once, top to bottom. Break reps up as needed.",
-       mv:c.map(function(x){return{n:x.n,q:(x.u?r5(x.b*2.5):r5(x.b*(LIFT.indexOf(x)>-1?2.5:3)))+(x.u?" cal":"")}})};
+       mv:c.map(function(x){return{n:x.n,w:LIFT.indexOf(x)>-1,q:(x.u?r5(x.b*2.5):r5(x.b*(LIFT.indexOf(x)>-1?2.5:3)))+(x.u?" cal":"")}})};
   }
   return w;
 }
@@ -114,32 +117,38 @@ function vid(name){
   q=(q==="Row"?"rowing machine technique":q+" how to");
   return ' <a class="vid" target="_blank" rel="noopener" title="Watch how" href="https://www.youtube.com/results?search_query='+encodeURIComponent(q)+'">\u25B6</a>';
 }
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function nm(m){return W.f==="EMOM"?m.q.split(" x ")[0]:m.n}
+function getW(){try{return JSON.parse(localStorage.getItem("wod-weights")||"{}")}catch(e){return{}}}
+function wtIn(m){return m.w?'<input class="wt" type="text" placeholder="weight" data-n="'+esc(nm(m))+'" value="'+esc(getW()[nm(m)]||"")+'">':""}
+document.addEventListener("input",function(e){var el=e.target;if(el.classList&&el.classList.contains("wt")){var w=getW();w[el.getAttribute("data-n")]=el.value;try{localStorage.setItem("wod-weights",JSON.stringify(w))}catch(x){}}});
 function render(){
   W=build(seedFrom(key+"#"+offset));
   document.getElementById("date").textContent=d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
   document.getElementById("wod").innerHTML='<span class="fmt">'+W.f+'</span><div class="title">'+W.title+'</div><p class="sub">'+W.sub+'</p><ul class="mv">'+
-    W.mv.map(function(m){return"<li><span>"+(m.q.indexOf(" x ")>-1&&W.f==="EMOM"?m.q:m.n)+vid(W.f==="EMOM"?m.q.split(" x ")[0]:m.n)+"</span><span>"+(W.f==="EMOM"?m.n:m.q)+"</span></li>"}).join("")+"</ul>";
+    W.mv.map(function(m){return"<li><span>"+(m.q.indexOf(" x ")>-1&&W.f==="EMOM"?m.q:m.n)+vid(nm(m))+wtIn(m)+"</span><span>"+(W.f==="EMOM"?m.n:m.q)+"</span></li>"}).join("")+"</ul>";
   reset();
 }
 
 // Timer
-var t=0,iv=null;
+var t=0,iv=null,pre=0;
 function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 function show(){
   var shown=W.cap?Math.max(0,W.cap-t):t;
   document.getElementById("clock").textContent=fmt(shown);
-  var cur="";
+  var cur="";if(pre>0){document.getElementById("clock").textContent=pre;document.getElementById("cur").textContent="Get ready\u2026";return}
   if(W.f==="EMOM"&&t<W.cap){cur="Min "+(Math.floor(t/60)+1)+": "+W.emom[Math.floor(t/60)%W.emom.length]}
   if(W.cap&&t>=W.cap){cur="Time!"}
   document.getElementById("cur").textContent=cur;
 }
-function tick(){t++;show();if(W.cap&&t>=W.cap){stop();beep()}}
-function beep(){try{navigator.vibrate&&navigator.vibrate([300,100,300])}catch(e){}}
+function tick(){if(pre>0){pre--;if(pre>0&&pre<=3)tone(660,120);if(pre===0)beep();show();return}t++;show();if(W.cap&&t>=W.cap){stop();beep()}}
+function tone(f,ms){try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;window._ac=window._ac||new C();var o=window._ac.createOscillator(),g=window._ac.createGain();o.frequency.value=f;g.gain.value=.15;o.connect(g);g.connect(window._ac.destination);o.start();o.stop(window._ac.currentTime+ms/1000)}catch(e){}}
+function beep(){tone(990,500);try{navigator.vibrate&&navigator.vibrate([300,100,300])}catch(e){}}
 function stop(){clearInterval(iv);iv=null;document.getElementById("go").textContent="Start"}
-function reset(){stop();t=0;show()}
+function reset(){stop();t=0;pre=0;show()}
 document.getElementById("go").onclick=function(){
   if(iv){stop();return}
-  if(W.cap&&t>=W.cap)t=0;
+  if(W.cap&&t>=W.cap)t=0;if(t===0&&pre===0)pre=10;
   iv=setInterval(tick,1000);this.textContent="Pause";
 };
 document.getElementById("rst").onclick=reset;
@@ -152,18 +161,34 @@ document.getElementById("reroll").onclick=function(){
 
 // Log
 function getLog(){try{return JSON.parse(localStorage.getItem("wod-log")||"[]")}catch(e){return[]}}
+var showAll=false;
 function drawLog(){
-  var l=getLog(),el=document.getElementById("log");
-  el.innerHTML=l.length?l.slice().reverse().slice(0,10).map(function(x){
-    return"<div><span>"+x.title+"<br><small>"+x.d+"</small></span><span>"+x.time+"</span></div>"}).join(""):'<div class="empty">Nothing logged yet.</div>';
+  var l=getLog(),el=document.getElementById("log"),n=showAll?l.length:10;
+  el.innerHTML=l.length?l.slice().reverse().slice(0,n).map(function(x){
+    var w=(x.wts&&x.wts.length)?"<br><small>"+esc(x.wts.join(" \u00b7 "))+"</small>":"";
+    return"<div><span>"+esc(x.title)+"<br><small>"+esc(x.d)+"</small>"+w+"</span><span>"+esc(x.time)+"</span></div>"}).join(""):'<div class="empty">Nothing logged yet.</div>';
+  var b=document.getElementById("all");b.style.display=l.length>10?"":"none";b.textContent=showAll?"Show recent":"Show all ("+l.length+")";
 }
+document.getElementById("all").onclick=function(){showAll=!showAll;drawLog()};
+function csv(){var rows=[["Date","Workout","Time","Weights"]];getLog().forEach(function(x){rows.push([x.d,x.title,x.time,(x.wts||[]).join("; ")])});return rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"'}).join(",")}).join("\r\n")}
+function flash(b,txt){var o=b.textContent;b.textContent=txt;setTimeout(function(){b.textContent=o},1500)}
+document.getElementById("exp").onclick=function(){
+  var b=this,text=csv();
+  try{var f=new File([text],"wod-log.csv",{type:"text/csv"});if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:"WOD log"}).catch(function(){});return}}catch(e){}
+  try{var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/csv"}));a.download="wod-log.csv";document.body.appendChild(a);a.click();a.remove();flash(b,"Exported \u2713")}catch(e){flash(b,"Try Copy")}
+};
+document.getElementById("cp").onclick=function(){
+  var b=this;try{navigator.clipboard.writeText(csv()).then(function(){flash(b,"Copied \u2713")},function(){flash(b,"Failed")})}catch(e){flash(b,"Failed")}
+};
 document.getElementById("done").onclick=function(){
   var l=getLog();
-  l.push({d:key,title:W.f+": "+W.title,time:t?fmt(t):"done"});
+  var ws=[];document.querySelectorAll("input.wt").forEach(function(i){if(i.value.trim())ws.push(i.getAttribute("data-n")+": "+i.value.trim())});
+  l.push({d:key,title:W.f+": "+W.title,time:t?fmt(t):"done",wts:ws});
   try{localStorage.setItem("wod-log",JSON.stringify(l))}catch(e){}
   drawLog();this.textContent="Logged \u2713";var b=this;setTimeout(function(){b.textContent="Mark done"},1500);
 };
 
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 render();drawLog();
 </script>
 </body>
