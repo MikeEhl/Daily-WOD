@@ -36,6 +36,13 @@ button.p{background:var(--accent);border-color:var(--accent);color:#fff}
 .wt{display:block;width:96px;margin-top:6px;font:inherit;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
 .log .wrow{border-top:0;padding:0;margin-top:10px;display:flex;gap:8px;justify-content:flex-start}
 button.s{padding:8px 12px;font-size:14px;min-width:0;flex:none}
+.rnd{display:flex;align-items:center;gap:14px}
+.rnd .rl{color:var(--muted);font-size:14px}
+.rnd .rn{font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;min-width:56px}
+.rnd .row{flex:1;flex-wrap:nowrap}
+.rnd button{padding:16px 12px}
+textarea{display:block;width:100%;font:inherit;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);resize:vertical}
+.log small{white-space:pre-wrap}
 h2{font-size:16px;margin:0 0 8px}
 .log div{padding:8px 0;border-top:1px solid var(--line);font-size:14px;display:flex;justify-content:space-between;gap:10px}
 .log small{color:var(--muted)}
@@ -55,6 +62,11 @@ h2{font-size:16px;margin:0 0 8px}
       <button id="rst">Reset</button>
     </div>
   </div>
+  <div class="card rnd">
+    <div><div class="rl">Rounds</div><div class="rn" id="rn">0</div></div>
+    <div class="row"><button id="rminus" style="flex:0 0 56px;min-width:0">&minus;</button><button class="p" id="rplus">+ Round</button></div>
+  </div>
+  <div class="card"><h2>Notes</h2><textarea id="note" rows="3" placeholder="Weights used, substitutions, how it felt..."></textarea></div>
   <div class="row" style="margin-bottom:14px">
     <button id="reroll">Reroll</button>
     <button class="p" id="done">Mark done</button>
@@ -118,12 +130,14 @@ function vid(name){
   return ' <a class="vid" target="_blank" rel="noopener" title="Watch how" href="https://www.youtube.com/results?search_query='+encodeURIComponent(q)+'">\u25B6</a>';
 }
 function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function noteKey(){return"wod-note-"+key+"-"+offset}
+function loadNote(){var n=document.getElementById("note");try{n.value=localStorage.getItem(noteKey())||""}catch(e){n.value=""}}
 function nm(m){return W.f==="EMOM"?m.q.split(" x ")[0]:m.n}
 function getW(){try{return JSON.parse(localStorage.getItem("wod-weights")||"{}")}catch(e){return{}}}
 function wtIn(m){return m.w?'<input class="wt" type="text" placeholder="weight" data-n="'+esc(nm(m))+'" value="'+esc(getW()[nm(m)]||"")+'">':""}
 document.addEventListener("input",function(e){var el=e.target;if(el.classList&&el.classList.contains("wt")){var w=getW();w[el.getAttribute("data-n")]=el.value;try{localStorage.setItem("wod-weights",JSON.stringify(w))}catch(x){}}});
 function render(){
-  W=build(seedFrom(key+"#"+offset));
+  W=build(seedFrom(key+"#"+offset));loadNote();
   document.getElementById("date").textContent=d.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
   document.getElementById("wod").innerHTML='<span class="fmt">'+W.f+'</span><div class="title">'+W.title+'</div><p class="sub">'+W.sub+'</p><ul class="mv">'+
     W.mv.map(function(m){return"<li><span>"+(m.q.indexOf(" x ")>-1&&W.f==="EMOM"?m.q:m.n)+vid(nm(m))+wtIn(m)+"</span><span>"+(W.f==="EMOM"?m.n:m.q)+"</span></li>"}).join("")+"</ul>";
@@ -131,7 +145,7 @@ function render(){
 }
 
 // Timer
-var t=0,iv=null,pre=0;
+var t=0,iv=null,pre=0,rounds=0;
 function fmt(s){return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 function show(){
   var shown=W.cap?Math.max(0,W.cap-t):t;
@@ -145,7 +159,10 @@ function tick(){if(pre>0){pre--;if(pre>0&&pre<=3)tone(660,120);if(pre===0)beep()
 function tone(f,ms){try{var C=window.AudioContext||window.webkitAudioContext;if(!C)return;window._ac=window._ac||new C();var o=window._ac.createOscillator(),g=window._ac.createGain();o.frequency.value=f;g.gain.value=.15;o.connect(g);g.connect(window._ac.destination);o.start();o.stop(window._ac.currentTime+ms/1000)}catch(e){}}
 function beep(){tone(990,500);try{navigator.vibrate&&navigator.vibrate([300,100,300])}catch(e){}}
 function stop(){clearInterval(iv);iv=null;document.getElementById("go").textContent="Start"}
-function reset(){stop();t=0;pre=0;show()}
+function showR(){document.getElementById("rn").textContent=rounds}
+function reset(){stop();t=0;pre=0;rounds=0;showR();show()}
+document.getElementById("rplus").onclick=function(){rounds++;showR();try{navigator.vibrate&&navigator.vibrate(30)}catch(e){}};
+document.getElementById("rminus").onclick=function(){if(rounds>0)rounds--;showR()};
 document.getElementById("go").onclick=function(){
   if(iv){stop();return}
   if(W.cap&&t>=W.cap)t=0;if(t===0&&pre===0)pre=10;
@@ -165,12 +182,12 @@ var showAll=false;
 function drawLog(){
   var l=getLog(),el=document.getElementById("log"),n=showAll?l.length:10;
   el.innerHTML=l.length?l.slice().reverse().slice(0,n).map(function(x){
-    var w=(x.wts&&x.wts.length)?"<br><small>"+esc(x.wts.join(" \u00b7 "))+"</small>":"";
-    return"<div><span>"+esc(x.title)+"<br><small>"+esc(x.d)+"</small>"+w+"</span><span>"+esc(x.time)+"</span></div>"}).join(""):'<div class="empty">Nothing logged yet.</div>';
+    var nt=x.note?"<br><small>"+esc(x.note)+"</small>":"";var w=(x.wts&&x.wts.length)?"<br><small>"+esc(x.wts.join(" \u00b7 "))+"</small>":"";
+    return"<div><span>"+esc(x.title)+"<br><small>"+esc(x.d)+"</small>"+w+nt+"</span><span>"+esc(x.time)+(x.rounds?"<br><small>"+x.rounds+" rd</small>":"")+"</span></div>"}).join(""):'<div class="empty">Nothing logged yet.</div>';
   var b=document.getElementById("all");b.style.display=l.length>10?"":"none";b.textContent=showAll?"Show recent":"Show all ("+l.length+")";
 }
 document.getElementById("all").onclick=function(){showAll=!showAll;drawLog()};
-function csv(){var rows=[["Date","Workout","Time","Weights"]];getLog().forEach(function(x){rows.push([x.d,x.title,x.time,(x.wts||[]).join("; ")])});return rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"'}).join(",")}).join("\r\n")}
+function csv(){var rows=[["Date","Workout","Time","Rounds","Weights","Notes"]];getLog().forEach(function(x){rows.push([x.d,x.title,x.time,x.rounds||"",(x.wts||[]).join("; "),x.note||""])});return rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"'}).join(",")}).join("\r\n")}
 function flash(b,txt){var o=b.textContent;b.textContent=txt;setTimeout(function(){b.textContent=o},1500)}
 document.getElementById("exp").onclick=function(){
   var b=this,text=csv();
@@ -183,12 +200,13 @@ document.getElementById("cp").onclick=function(){
 document.getElementById("done").onclick=function(){
   var l=getLog();
   var ws=[];document.querySelectorAll("input.wt").forEach(function(i){if(i.value.trim())ws.push(i.getAttribute("data-n")+": "+i.value.trim())});
-  l.push({d:key,title:W.f+": "+W.title,time:t?fmt(t):"done",wts:ws});
+  l.push({d:key,title:W.f+": "+W.title,time:t?fmt(t):"done",wts:ws,rounds:rounds,note:document.getElementById("note").value.trim()});
   try{localStorage.setItem("wod-log",JSON.stringify(l))}catch(e){}
   drawLog();this.textContent="Logged \u2713";var b=this;setTimeout(function(){b.textContent="Mark done"},1500);
 };
 
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+document.getElementById("note").oninput=function(){try{localStorage.setItem(noteKey(),this.value)}catch(e){}};
 render();drawLog();
 </script>
 </body>
