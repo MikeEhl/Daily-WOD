@@ -182,8 +182,8 @@ var showAll=false;
 function drawLog(){
   var l=getLog(),el=document.getElementById("log"),n=showAll?l.length:10;
   el.innerHTML=l.length?l.slice().reverse().slice(0,n).map(function(x){
-    var nt=x.note?"<br><small>"+esc(x.note)+"</small>":"";var w=(x.wts&&x.wts.length)?"<br><small>"+esc(x.wts.join(" \u00b7 "))+"</small>":"";
-    return"<div><span>"+esc(x.title)+"<br><small>"+esc(x.d)+"</small>"+w+nt+"</span><span>"+esc(x.time)+(x.rounds?"<br><small>"+x.rounds+" rd</small>":"")+"</span></div>"}).join(""):'<div class="empty">Nothing logged yet.</div>';
+    var parts=[];if(x.rounds)parts.push(x.rounds+" rd");if(x.wts&&x.wts.length)parts.push(x.wts.join(", "));if(x.note)parts.push(x.note.replace(/\s*\n\s*/g," / "));
+    return"<div><span><small>"+esc(x.d)+"</small> "+esc(x.title)+(parts.length?" <small>\u00b7 "+esc(parts.join(" \u00b7 "))+"</small>":"")+"</span><span>"+esc(x.time)+"</span></div>"}).join(""):'<div class="empty">Nothing logged yet.</div>';
   var b=document.getElementById("all");b.style.display=l.length>10?"":"none";b.textContent=showAll?"Show recent":"Show all ("+l.length+")";
 }
 document.getElementById("all").onclick=function(){showAll=!showAll;drawLog()};
